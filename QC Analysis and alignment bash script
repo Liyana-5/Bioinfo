@@ -1,0 +1,40 @@
+# RESOURCE FILES
+adapter='/export/projects/polyomics/biostuds/data/illumina_adapter.fa'
+hs2index='/export/projects/polyomics/Genome/Mus_musculus/mm10/Hisat2Index/chr2'
+gtf='/export/projects/polyomics/Genome/Mus_musculus/mm10/annotations/chr2.gtf'
+data='../data'
+#
+# MAKE FEW SUBDIRS UNLESS THEY EXIST
+hisat_dir='./hisat2'
+stringtie_dir='./stringtie'
+mkdir -p ${hisat_dir}
+mkdir -p ${stringtie_dir}
+#
+gtflist='list.gtf.txt'
+rm -f ${gtflist}
+#
+# RUNNING a single LOOP for all the work
+ for sample in s1.c2 s2.c2 s3.c2 s4.c2 s5.c2 s6.c2 s7.c2 s8.c2 s9.c2 s10.c2 s11.c2 s12.c2
+ do
+        fastq="${data}/${sample}.fq"
+        trim1="${data}/${sample}.t1.fq"
+        trim2="${data}/${sample}.t2.fq"
+        bam="${hisat_dir}/${sample}.bam"
+        sam="${hisat_dir}/${sample}.sam"
+        sorted_bam="${hisat_dir}/${sample}.sort.bam"
+        scythe -q sanger -a ${adapter} -o ${trim1} ${fastq}
+        sickle se -f ${trim1} -t sanger -o ${trim2} -q 10 -l 50
+        hisat2 -p 4 --phred33 -x ${hs2index} -U ${trim2} -S ${sam}
+        samtools view -b -o ${bam} ${sam}
+        samtools sort -o ${sorted_bam} ${bam}
+        rm ${sam} ${bam}
+        rm ${trim1} ${trim2}
+
+        str_smp_dir="${stringtie_dir}/${sample}"
+        mkdir -p ${str_smp_dir}
+        sample_tr_gtf="${str_smp_dir}/${sample}_transcripts.gtf"
+        stringtie -p 4 -t -e -B -G ${gtf} -o ${sample_tr_gtf} ${sorted_bam}
+        gtfline="${sample} ${sample_tr_gtf}"
+        echo ${gtfline} >> ${gtflist}
+ done
+ prepDE.py -i ${gtflist}
